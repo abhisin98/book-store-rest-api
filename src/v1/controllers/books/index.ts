@@ -1,16 +1,8 @@
 import { Request, Response } from "express";
-
-type IData = {
-  id: string | number;
-  name: string;
-};
-const data = [
-  { id: 1, name: "book 1" },
-  { id: 2, name: "book 2" },
-] satisfies IData[];
+import { connectDB, closeDB, IBooks, books } from "@database";
 
 // --------------------------------------------------------------------
-export function GET(req: Request, res: Response) {
+export async function GET(req: Request, res: Response) {
   // Allow only GET requests
   if (req.method !== "GET") {
     res.status(405).json({
@@ -21,8 +13,12 @@ export function GET(req: Request, res: Response) {
   }
 
   try {
+    await connectDB();
+    const result = await books.find().exec();
+    await closeDB();
+
     // Check if data exists before responding
-    if (!Array.isArray(data) || data.length === 0) {
+    if (!Array.isArray(result) || result.length === 0) {
       res.status(404).json({
         error: "Not Found",
         message: "No data available.",
@@ -30,7 +26,7 @@ export function GET(req: Request, res: Response) {
       return;
     }
 
-    res.status(200).json(data);
+    res.status(200).json(result);
     return;
   } catch (error) {
     console.error("Error processing request:", error);
@@ -43,7 +39,7 @@ export function GET(req: Request, res: Response) {
 }
 
 // --------------------------------------------------------------------
-export function POST(req: Request, res: Response) {
+export async function POST(req: Request, res: Response) {
   // Allow only POST requests
   if (req.method !== "POST") {
     res.status(405).json({
@@ -53,25 +49,40 @@ export function POST(req: Request, res: Response) {
     return;
   }
 
-  const { name } = req.body as IData;
+  const { title, author, price, publishedDate } = req.body as IBooks;
 
   try {
-    // Check if name input is valid
-    if (!name || name.trim().length === 0) {
+    // Check if input is valid
+    if (
+      !isValidString(title) ||
+      !isValidString(author) ||
+      !isValidString(price) ||
+      !isValidDate(publishedDate?.toString())
+    ) {
       res.status(400).json({
         error: "Bad Request",
-        message: "Invalid input data. Please provide a valid name.",
+        message: "Invalid input data. Please provide a valid input.",
       });
       return;
     }
 
     // Add new data
-    const id = data.length + 1;
-    data.push({ id, name });
+    await connectDB();
+    const result = await books.create({ title, author, price, publishedDate });
+    await closeDB();
 
-    res
-      .status(201)
-      .json({ id, message: "Your data has been submitted successfully." });
+    if (!result || !result.id) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "Failed to create item",
+      });
+      return;
+    }
+
+    res.status(201).json({
+      id: result?.id?.toString(),
+      message: "Your data has been submitted successfully.",
+    });
     return;
   } catch (error) {
     console.error("Error processing request:", error);
@@ -84,7 +95,7 @@ export function POST(req: Request, res: Response) {
 }
 
 // --------------------------------------------------------------------
-export function PUT(req: Request, res: Response) {
+export async function PUT(req: Request, res: Response) {
   // Allow only PUT requests
   if (req.method !== "PUT") {
     res.status(405).json({
@@ -94,34 +105,78 @@ export function PUT(req: Request, res: Response) {
     return;
   }
 
-  const { id } = req.params as IData;
-  const { name } = req.body as IData;
+  const { id } = req.params as { id: string };
+  const { title, author, price, publishedDate } = req.body as IBooks;
 
   try {
     // Validate input
-    if (!id || !name || name.trim().length === 0) {
+    if (!id) {
       res.status(400).json({
         error: "Bad Request",
-        message: "Invalid input data. Please provide a valid id and name.",
+        message: "Invalid input data. Please provide a valid ID.",
       });
       return;
     }
 
-    // Find and update data
-    const index = data.findIndex((item) => item.id === id);
-    if (index === -1) {
+    if (
+      (title && !isValidString(title)) ||
+      (author && !isValidString(author)) ||
+      (price && !isValidString(price)) ||
+      (publishedDate && !isValidDate(publishedDate?.toString()))
+    ) {
+      res.status(400).json({
+        error: "Bad Request",
+        message: "Invalid input data. Please provide a valid input.",
+      });
+      return;
+    }
+
+    // Find data
+    await connectDB();
+    const result = await books.findById(id);
+
+    if (!result || !result?.id) {
       res.status(404).json({
         error: "Not Found",
         message: "Data with the specified ID not found.",
       });
+      await closeDB();
       return;
     }
 
-    data[index].name = name;
+    // Update data
+    let updateInput: Partial<IBooks> = {};
+    if (title) {
+      updateInput.title = title;
+    }
+    if (author) {
+      updateInput.author = author;
+    }
+    if (price) {
+      updateInput.price = price;
+    }
+    if (publishedDate) {
+      updateInput.publishedDate = publishedDate;
+    }
 
-    res
-      .status(200)
-      .json({ id, message: "Your data has been updated successfully." });
+    const updateResult = await books.updateOne(
+      { _id: result?.id },
+      updateInput
+    );
+
+    if (updateResult?.modifiedCount == 1) {
+      res
+        .status(200)
+        .json({ id, message: "Your data has been updated successfully." });
+    } else {
+      res.status(400).json({
+        error: "Update failed",
+        message:
+          "No changes were made to your data. Ensure the provided ID and data are correct.",
+      });
+    }
+
+    await closeDB();
     return;
   } catch (error) {
     console.error("Error processing request:", error);
@@ -134,7 +189,7 @@ export function PUT(req: Request, res: Response) {
 }
 
 // --------------------------------------------------------------------
-export function DELETE(req: Request, res: Response) {
+export async function DELETE(req: Request, res: Response) {
   // Allow only DELETE requests
   if (req.method !== "DELETE") {
     res.status(405).json({
@@ -144,7 +199,7 @@ export function DELETE(req: Request, res: Response) {
     return;
   }
 
-  const { id } = req.params as { id: string | number };
+  const { id } = req.params as { id: string };
 
   try {
     // Validate input
@@ -157,17 +212,19 @@ export function DELETE(req: Request, res: Response) {
     }
 
     // Find and delete data
-    const index = data.findIndex((item) => item.id === id);
-    if (index === -1) {
+    await connectDB();
+    const result = await books.findByIdAndDelete(id);
+
+    if (!result || !result.id) {
       res.status(404).json({
         error: "Not Found",
         message: "Data with the specified ID not found.",
       });
+      await closeDB();
       return;
     }
 
-    data.splice(index, 1);
-
+    await closeDB();
     res
       .status(200)
       .json({ id, message: "Your data has been deleted successfully." });
@@ -180,4 +237,15 @@ export function DELETE(req: Request, res: Response) {
     });
     return;
   }
+}
+
+// --------------------------------------------------------------------
+function isValidDate(dateString: any): boolean {
+  const date = new Date(dateString);
+  return !isNaN(date.getTime()); // Check if it's a valid date
+}
+
+// --------------------------------------------------------------------
+function isValidString(str: any): boolean {
+  return typeof str === "string" && str.trim().length > 0;
 }

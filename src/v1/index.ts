@@ -1,7 +1,6 @@
 import { Router } from "express";
 import helmet from "helmet";
 
-import { exampleRouter } from "./routes/example.routes";
 import { booksRouter } from "./routes/books.routes";
 
 //---------------------------------------------------------------------------
@@ -13,7 +12,6 @@ const api: Router = Router();
 //---------------------------------------------------------------------------
 // You may add application-specific API routes here
 // TODO: move all controllers in the controllers folder
-api.use("/example", exampleRouter);
 api.use("/books", booksRouter);
 api.get("/", (req, res) => {
   res.status(200).json({ status: true, info: "API version 1 is running" });

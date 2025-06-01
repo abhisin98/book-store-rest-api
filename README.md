@@ -66,16 +66,16 @@ Returns the API status.
 }
 ```
 
-## 📜 Example API Endpoints
+## 📜 Books API Endpoints
 
 Below are the available endpoints in this API:
 
-| Method     | Endpoint                 | Description              |
-| ---------- | ------------------------ | ------------------------ |
-| **GET**    | `/api/v1/example`        | Fetch example data       |
-| **POST**   | `/api/v1/example/add`    | Create new example entry |
-| **PUT**    | `/api/v1/example/update` | Update example data      |
-| **DELETE** | `/api/v1/example/delete` | Remove example entry     |
+| Method     | Endpoint            | Description           |
+| ---------- | ------------------- | --------------------- |
+| **GET**    | `/api/v1/books`     | Fetch books data      |
+| **POST**   | `/api/v1/books`     | Create new book entry |
+| **PUT**    | `/api/v1/books/:id` | Update book data      |
+| **DELETE** | `/api/v1/books/:id` | Remove book entry     |
 
 ## 🛠️ Development Setup
 
